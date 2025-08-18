@@ -10,7 +10,11 @@ interface ShelfLifeResultsProps {
   manufacturingDate?: string;
   storageCondition: string;
   isOpened: boolean;
-  onSetReminder?: () => void;
+  onSetReminder?: (data: {
+    expiryDate: Date | null;
+    reminderDate: Date | null;
+    shelfLifeDays: number;
+  }) => void;
 }
 
 export const ShelfLifeResults = ({
@@ -21,7 +25,6 @@ export const ShelfLifeResults = ({
   isOpened,
   onSetReminder
 }: ShelfLifeResultsProps) => {
-  
   // Shelf life data in days based on category and storage
   const getShelfLifeDays = () => {
     const shelfLifeData: Record<string, Record<string, number>> = {
@@ -41,8 +44,6 @@ export const ShelfLifeResults = ({
 
     const categoryKey = category.toLowerCase().replace(/\s+/g, '_');
     const baseDays = shelfLifeData[categoryKey]?.[storageCondition] || 30;
-    
-    // Reduce shelf life if opened
     return isOpened ? Math.floor(baseDays * 0.6) : baseDays;
   };
 
@@ -53,7 +54,7 @@ export const ShelfLifeResults = ({
   let reminderDate: Date | null = null;
   
   if (hasManufacturingDate) {
-    expiryDate = addDays(new Date(manufacturingDate), shelfLifeDays);
+    expiryDate = addDays(new Date(manufacturingDate as string), shelfLifeDays);
     reminderDate = addDays(expiryDate, -2);
   }
 
@@ -66,7 +67,6 @@ export const ShelfLifeResults = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        
         {/* Product Info */}
         <div className="bg-background rounded-lg p-4 border">
           <h3 className="font-semibold text-foreground mb-2">{productName}</h3>
@@ -79,7 +79,6 @@ export const ShelfLifeResults = ({
         </div>
 
         {hasManufacturingDate && expiryDate ? (
-          /* With Manufacturing Date - Show Expiry */
           <div className="space-y-3">
             <div className="flex items-center justify-between p-4 bg-background rounded-lg border">
               <div className="flex items-center gap-3">
@@ -92,7 +91,7 @@ export const ShelfLifeResults = ({
                 </div>
               </div>
               <Button 
-                onClick={onSetReminder}
+                onClick={() => onSetReminder?.({ expiryDate, reminderDate, shelfLifeDays })}
                 className="bg-fresh hover:bg-fresh/90 text-white"
                 size="sm"
               >
@@ -111,7 +110,6 @@ export const ShelfLifeResults = ({
             )}
           </div>
         ) : (
-          /* Without Manufacturing Date - Show Typical Shelf Life */
           <div className="space-y-3">
             <div className="p-4 bg-background rounded-lg border">
               <div className="flex items-center gap-3 mb-2">
@@ -139,7 +137,6 @@ export const ShelfLifeResults = ({
             </div>
           </div>
         )}
-        
       </CardContent>
     </Card>
   );

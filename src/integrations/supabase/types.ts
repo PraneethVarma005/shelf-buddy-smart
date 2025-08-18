@@ -14,7 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      products: {
+        Row: {
+          category: string
+          created_at: string
+          expiry_date: string | null
+          id: string
+          is_opened: boolean
+          manufacturing_date: string | null
+          product_name: string
+          reminder_date: string | null
+          reminder_sent: boolean
+          storage_condition: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          is_opened?: boolean
+          manufacturing_date?: string | null
+          product_name: string
+          reminder_date?: string | null
+          reminder_sent?: boolean
+          storage_condition: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          is_opened?: boolean
+          manufacturing_date?: string | null
+          product_name?: string
+          reminder_date?: string | null
+          reminder_sent?: boolean
+          storage_condition?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

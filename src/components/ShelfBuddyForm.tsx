@@ -10,6 +10,9 @@ import { CalendarIcon, Search, AlertCircle } from "lucide-react";
 import { StorageToggle } from "@/components/StorageToggle";
 import { ShelfLifeResults } from "@/components/ShelfLifeResults";
 import { toast } from "@/hooks/use-toast";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const categories = [
   "Dairy Products",
@@ -34,6 +37,8 @@ export const ShelfBuddyForm = () => {
   const [storageCondition, setStorageCondition] = useState("room");
   const [isOpened, setIsOpened] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const { user } = useSupabaseAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,11 +79,55 @@ export const ShelfBuddyForm = () => {
     });
   };
 
-  const handleSetReminder = () => {
+  const handleSetReminder = async (data: { expiryDate: Date | null; reminderDate: Date | null; shelfLifeDays: number }) => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please login to set reminders and save products to your account.",
+        variant: "destructive"
+      });
+      navigate("/auth");
+      return;
+    }
+
+    if (!data.expiryDate || !data.reminderDate) {
+      toast({
+        title: "Missing dates",
+        description: "Please ensure a manufacturing date is provided to compute reminder.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const payload = {
+      user_id: user.id,
+      product_name: productName,
+      category,
+      manufacturing_date: manufacturingDate ? manufacturingDate : null,
+      expiry_date: data.expiryDate.toISOString().slice(0, 10),
+      storage_condition: storageCondition,
+      is_opened: isOpened,
+      reminder_date: data.reminderDate.toISOString().slice(0, 10),
+      reminder_sent: false,
+    };
+
+    console.log("Inserting product reminder:", payload);
+
+    const { error } = await supabase.from("products").insert([payload]);
+
+    if (error) {
+      console.error("Insert error:", error);
+      toast({
+        title: "Could not save reminder",
+        description: error.message,
+        variant: "destructive"
+      });
+      return;
+    }
+
     toast({
-      title: "Login Required",
-      description: "Please login to set reminders and save products to your account.",
-      variant: "destructive"
+      title: "Reminder saved!",
+      description: "We will email you 2 days before the expiry date.",
     });
   };
 
@@ -96,7 +145,6 @@ export const ShelfBuddyForm = () => {
     <div className="space-y-6">
       {!showResults ? (
         <form onSubmit={handleSubmit} className="space-y-6">
-          
           {/* Manufacturing Date Checkbox */}
           <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg border border-border">
             <Checkbox

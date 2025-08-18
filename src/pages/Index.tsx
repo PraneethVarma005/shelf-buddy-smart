@@ -1,14 +1,39 @@
 
-import { useState } from "react";
 import { ShelfBuddyForm } from "@/components/ShelfBuddyForm";
 import { InfoAccordion } from "@/components/InfoAccordion";
-import { Leaf, Shield, Calendar, Thermometer } from "lucide-react";
+import { Leaf, Shield, Calendar, Thermometer, LogIn, LogOut } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
+  const { user, signOut } = useSupabaseAuth();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-accent/20 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
-        
+        {/* Small auth bar */}
+        <div className="flex items-center justify-end mb-4">
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground truncate max-w-[180px]">
+                {user.email}
+              </span>
+              <Button variant="outline" size="sm" onClick={signOut}>
+                <LogOut className="h-4 w-4 mr-1" />
+                Logout
+              </Button>
+            </div>
+          ) : (
+            <Link to="/auth" className="inline-flex">
+              <Button size="sm">
+                <LogIn className="h-4 w-4 mr-1" />
+                Login / Sign up
+              </Button>
+            </Link>
+          )}
+        </div>
+
         {/* Header */}
         <div className="text-left mb-8 animate-fade-in">
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 flex items-center gap-3">
@@ -63,7 +88,6 @@ const Index = () => {
             <p className="text-sm text-muted-foreground">Considers storage conditions</p>
           </div>
         </div>
-
       </div>
     </div>
   );

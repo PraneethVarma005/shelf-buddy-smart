@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, AlertTriangle, Bell } from "lucide-react";
 import { format, addDays } from "date-fns";
+import { findProductByName } from "@/data/productDatabase";
 
 interface ShelfLifeResultsProps {
   productName: string;
@@ -25,8 +26,17 @@ export const ShelfLifeResults = ({
   isOpened,
   onSetReminder
 }: ShelfLifeResultsProps) => {
-  // Shelf life data in days based on category and storage
+  // Get shelf life days using product database first, then fallback to category
   const getShelfLifeDays = () => {
+    // First, try to find the specific product in our database
+    const foundProduct = findProductByName(productName);
+    
+    if (foundProduct) {
+      const baseDays = foundProduct.shelfLifeDays[storageCondition as 'room' | 'refrigerated' | 'frozen'];
+      return isOpened ? Math.floor(baseDays * foundProduct.openedMultiplier) : baseDays;
+    }
+
+    // Fallback to category-based calculation
     const shelfLifeData: Record<string, Record<string, number>> = {
       dairy_products: { room: 1, refrigerated: 7, frozen: 90 },
       fresh_fruits: { room: 3, refrigerated: 7, frozen: 365 },
@@ -49,6 +59,7 @@ export const ShelfLifeResults = ({
 
   const shelfLifeDays = getShelfLifeDays();
   const hasManufacturingDate = manufacturingDate && manufacturingDate !== '';
+  const foundProduct = findProductByName(productName);
   
   let expiryDate: Date | null = null;
   let reminderDate: Date | null = null;
@@ -76,6 +87,16 @@ export const ShelfLifeResults = ({
             <span>Status: {isOpened ? 'Opened' : 'Unopened'}</span>
             <span>Shelf Life: {shelfLifeDays} days</span>
           </div>
+          {foundProduct && (
+            <div className="mt-2 p-2 bg-green-50 rounded text-sm text-green-700">
+              ✓ Found in product database - using specific shelf life data
+            </div>
+          )}
+          {!foundProduct && (
+            <div className="mt-2 p-2 bg-yellow-50 rounded text-sm text-yellow-700">
+              ⚠ Using category-based shelf life estimation
+            </div>
+          )}
         </div>
 
         {hasManufacturingDate && expiryDate ? (

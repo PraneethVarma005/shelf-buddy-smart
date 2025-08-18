@@ -5,29 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarIcon, Search, AlertCircle } from "lucide-react";
+import { CalendarIcon, AlertCircle } from "lucide-react";
 import { StorageToggle } from "@/components/StorageToggle";
+import { ProductSearch } from "@/components/ProductSearch";
 import { ShelfLifeResults } from "@/components/ShelfLifeResults";
 import { toast } from "@/hooks/use-toast";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-
-const categories = [
-  "Dairy Products",
-  "Fresh Fruits",
-  "Fresh Vegetables", 
-  "Meat & Poultry",
-  "Seafood",
-  "Baked Goods",
-  "Canned Goods",
-  "Frozen Foods",
-  "Medicines",
-  "Supplements",
-  "Beverages",
-  "Condiments & Sauces"
-];
+import { findProductByName } from "@/data/productDatabase";
 
 export const ShelfBuddyForm = () => {
   const [knowsManufacturingDate, setKnowsManufacturingDate] = useState(false);
@@ -39,6 +25,11 @@ export const ShelfBuddyForm = () => {
   const [showResults, setShowResults] = useState(false);
   const { user } = useSupabaseAuth();
   const navigate = useNavigate();
+
+  const handleProductSelect = (name: string, cat: string) => {
+    setProductName(name);
+    setCategory(cat);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,42 +171,12 @@ export const ShelfBuddyForm = () => {
             </div>
           )}
 
-          {/* Product Search */}
-          <div className="space-y-2">
-            <Label htmlFor="product-name" className="text-sm font-medium">
-              Search Product
-            </Label>
-            <div className="relative">
-              <Input
-                id="product-name"
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                className="pl-10"
-                placeholder="Enter product name (e.g., Milk, Bread, Vitamin D)"
-              />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-
-          {/* Category Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="category" className="text-sm font-medium">
-              Select Category
-            </Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose product category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat.toLowerCase().replace(/\s+/g, '_')}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Product Search Component */}
+          <ProductSearch
+            onProductSelect={handleProductSelect}
+            productName={productName}
+            category={category}
+          />
 
           {/* Storage Conditions */}
           <div className="space-y-3">

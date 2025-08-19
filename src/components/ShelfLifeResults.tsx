@@ -16,6 +16,7 @@ interface ShelfLifeResultsProps {
     reminderDate: Date | null;
     shelfLifeDays: number;
   }) => void;
+  calculationMode: "product" | "category";
 }
 
 export const ShelfLifeResults = ({
@@ -24,19 +25,22 @@ export const ShelfLifeResults = ({
   manufacturingDate,
   storageCondition,
   isOpened,
-  onSetReminder
+  onSetReminder,
+  calculationMode
 }: ShelfLifeResultsProps) => {
-  // Get shelf life days using product database first, then fallback to category
+  // Get shelf life days using product database or category based on calculationMode
   const getShelfLifeDays = () => {
-    // First, try to find the specific product in our database
-    const foundProduct = findProductByName(productName);
-    
-    if (foundProduct) {
-      const baseDays = foundProduct.shelfLifeDays[storageCondition as 'room' | 'refrigerated' | 'frozen'];
-      return isOpened ? Math.floor(baseDays * foundProduct.openedMultiplier) : baseDays;
+    // Product-based calculation (preferred if product found)
+    if (calculationMode === "product" && productName) {
+      const found = findProductByName(productName);
+      if (found) {
+        const baseDays = found.shelfLifeDays[storageCondition as 'room' | 'refrigerated' | 'frozen'];
+        return isOpened ? Math.floor(baseDays * found.openedMultiplier) : baseDays;
+      }
+      // If product not found, fall back to category
     }
 
-    // Fallback to category-based calculation
+    // Category-based calculation
     const shelfLifeData: Record<string, Record<string, number>> = {
       dairy_products: { room: 1, refrigerated: 7, frozen: 90 },
       fresh_fruits: { room: 3, refrigerated: 7, frozen: 365 },
@@ -59,7 +63,7 @@ export const ShelfLifeResults = ({
 
   const shelfLifeDays = getShelfLifeDays();
   const hasManufacturingDate = manufacturingDate && manufacturingDate !== '';
-  const foundProduct = findProductByName(productName);
+  const foundProduct = calculationMode === "product" && productName ? findProductByName(productName) : undefined;
   
   let expiryDate: Date | null = null;
   let reminderDate: Date | null = null;
@@ -68,6 +72,9 @@ export const ShelfLifeResults = ({
     expiryDate = addDays(new Date(manufacturingDate as string), shelfLifeDays);
     reminderDate = addDays(expiryDate, -2);
   }
+
+  const usingProductData = calculationMode === "product" && Boolean(foundProduct);
+  const usingCategoryEstimate = calculationMode === "category" || !foundProduct;
 
   return (
     <Card className="mt-6 border-fresh/20 bg-fresh/5">
@@ -80,19 +87,21 @@ export const ShelfLifeResults = ({
       <CardContent className="space-y-4">
         {/* Product Info */}
         <div className="bg-background rounded-lg p-4 border">
-          <h3 className="font-semibold text-foreground mb-2">{productName}</h3>
+          <h3 className="font-semibold text-foreground mb-2">
+            {productName || "Unnamed item"}
+          </h3>
           <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-            <span>Category: {category.replace(/_/g, ' ')}</span>
+            <span>Category: {category ? category.replace(/_/g, ' ') : "Not selected"}</span>
             <span>Storage: {storageCondition}</span>
             <span>Status: {isOpened ? 'Opened' : 'Unopened'}</span>
             <span>Shelf Life: {shelfLifeDays} days</span>
           </div>
-          {foundProduct && (
+          {usingProductData && (
             <div className="mt-2 p-2 bg-green-50 rounded text-sm text-green-700">
-              ✓ Found in product database - using specific shelf life data
+              ✓ Using specific product data
             </div>
           )}
-          {!foundProduct && (
+          {usingCategoryEstimate && (
             <div className="mt-2 p-2 bg-yellow-50 rounded text-sm text-yellow-700">
               ⚠ Using category-based shelf life estimation
             </div>

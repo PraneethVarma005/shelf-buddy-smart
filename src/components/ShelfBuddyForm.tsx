@@ -23,6 +23,7 @@ export const ShelfBuddyForm = () => {
   const [storageCondition, setStorageCondition] = useState("room");
   const [isOpened, setIsOpened] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [searchMode, setSearchMode] = useState<"product" | "category">("product");
   const { user } = useSupabaseAuth();
   const navigate = useNavigate();
 
@@ -34,13 +35,24 @@ export const ShelfBuddyForm = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!productName || !category) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in the product name and category.",
-        variant: "destructive"
-      });
-      return;
+    if (searchMode === "product") {
+      if (!productName) {
+        toast({
+          title: "Missing product",
+          description: "Please enter a product name.",
+          variant: "destructive"
+        });
+        return;
+      }
+    } else if (searchMode === "category") {
+      if (!category) {
+        toast({
+          title: "Missing category",
+          description: "Please choose a product category.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     if (knowsManufacturingDate && !manufacturingDate) {
@@ -57,7 +69,8 @@ export const ShelfBuddyForm = () => {
       category,
       manufacturingDate: knowsManufacturingDate ? manufacturingDate : null,
       storageCondition,
-      isOpened
+      isOpened,
+      searchMode,
     });
     
     setShowResults(true);
@@ -86,6 +99,16 @@ export const ShelfBuddyForm = () => {
         title: "Missing dates",
         description: "Please ensure a manufacturing date is provided to compute reminder.",
         variant: "destructive"
+      });
+      return;
+    }
+
+    // product_name is required by the database and for better email content
+    if (!productName) {
+      toast({
+        title: "Product name required",
+        description: "Enter a product name to save a reminder and receive a recipe suggestion.",
+        variant: "destructive",
       });
       return;
     }
@@ -130,6 +153,7 @@ export const ShelfBuddyForm = () => {
     setKnowsManufacturingDate(false);
     setStorageCondition("room");
     setIsOpened(false);
+    setSearchMode("product");
   };
 
   return (
@@ -176,6 +200,8 @@ export const ShelfBuddyForm = () => {
             onProductSelect={handleProductSelect}
             productName={productName}
             category={category}
+            searchMode={searchMode}
+            onSearchModeChange={setSearchMode}
           />
 
           {/* Storage Conditions */}
@@ -235,6 +261,7 @@ export const ShelfBuddyForm = () => {
             storageCondition={storageCondition}
             isOpened={isOpened}
             onSetReminder={handleSetReminder}
+            calculationMode={searchMode}
           />
           
           <Button 

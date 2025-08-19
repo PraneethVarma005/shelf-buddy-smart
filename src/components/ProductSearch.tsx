@@ -26,10 +26,18 @@ interface ProductSearchProps {
   onProductSelect: (productName: string, category: string) => void;
   productName: string;
   category: string;
+  // Controlled search mode
+  searchMode: "product" | "category";
+  onSearchModeChange: (mode: "product" | "category") => void;
 }
 
-export const ProductSearch = ({ onProductSelect, productName, category }: ProductSearchProps) => {
-  const [searchMode, setSearchMode] = useState<"product" | "category">("product");
+export const ProductSearch = ({ 
+  onProductSelect, 
+  productName, 
+  category,
+  searchMode,
+  onSearchModeChange
+}: ProductSearchProps) => {
   const [productSuggestions, setProductSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -50,10 +58,12 @@ export const ProductSearch = ({ onProductSelect, productName, category }: Produc
   const handleProductNameChange = (value: string) => {
     onProductSelect(value, category);
     
-    // Auto-detect category if product is found in database
-    const foundProduct = findProductByName(value);
-    if (foundProduct) {
-      onProductSelect(value, foundProduct.category);
+    // Auto-detect category if product is found in database (only relevant in product mode)
+    if (searchMode === "product") {
+      const foundProduct = findProductByName(value);
+      if (foundProduct) {
+        onProductSelect(value, foundProduct.category);
+      }
     }
   };
 
@@ -61,6 +71,8 @@ export const ProductSearch = ({ onProductSelect, productName, category }: Produc
     const foundProduct = findProductByName(suggestion);
     if (foundProduct) {
       onProductSelect(suggestion, foundProduct.category);
+    } else {
+      onProductSelect(suggestion, category);
     }
     setShowSuggestions(false);
   };
@@ -76,7 +88,7 @@ export const ProductSearch = ({ onProductSelect, productName, category }: Produc
         <Label className="text-sm font-medium">Search Method</Label>
         <RadioGroup 
           value={searchMode} 
-          onValueChange={(value) => setSearchMode(value as "product" | "category")}
+          onValueChange={(value) => onSearchModeChange(value as "product" | "category")}
           className="flex flex-row space-x-6"
         >
           <div className="flex items-center space-x-2">
@@ -151,7 +163,7 @@ export const ProductSearch = ({ onProductSelect, productName, category }: Produc
             <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
           
-          {/* Manual Product Name for Category Mode */}
+          {/* Manual Product Name for Category Mode (Optional) */}
           <div className="mt-4">
             <Label htmlFor="manual-product-name" className="text-sm font-medium">
               Product Name (Optional)
@@ -161,7 +173,7 @@ export const ProductSearch = ({ onProductSelect, productName, category }: Produc
               type="text"
               value={productName}
               onChange={(e) => onProductSelect(e.target.value, category)}
-              placeholder="Enter specific product name"
+              placeholder="Enter specific product name (optional)"
             />
           </div>
         </div>

@@ -1,9 +1,11 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, AlertTriangle, Bell } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, Bell, Mail } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { findProductByName } from "@/data/productDatabase";
+import { supabase } from "@/integrations/supabase/client";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { toast } from "@/hooks/use-toast";
 
 interface ShelfLifeResultsProps {
   productName: string;
@@ -28,7 +30,8 @@ export const ShelfLifeResults = ({
   onSetReminder,
   calculationMode
 }: ShelfLifeResultsProps) => {
-  // Get shelf life days using product database or category based on calculationMode
+  const { user } = useSupabaseAuth();
+
   const getShelfLifeDays = () => {
     // Product-based calculation (preferred if product found)
     if (calculationMode === "product" && productName) {
@@ -76,6 +79,49 @@ export const ShelfLifeResults = ({
   const usingProductData = calculationMode === "product" && Boolean(foundProduct);
   const usingCategoryEstimate = calculationMode === "category" || !foundProduct;
 
+  const handleSendTestEmail = async () => {
+    if (!user?.email) {
+      toast({
+        title: "Email required",
+        description: "Please login to test email functionality.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('send-test-email', {
+        body: {
+          userEmail: user.email,
+          productName: productName || "Test Product",
+          expiryDate: expiryDate ? format(expiryDate, 'PPP') : "Test Expiry Date"
+        }
+      });
+
+      if (error) {
+        console.error("Test email error:", error);
+        toast({
+          title: "Failed to send test email",
+          description: error.message || "Please check your email configuration.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Test email sent! 📧",
+        description: `Check your inbox at ${user.email}`,
+      });
+    } catch (error: any) {
+      console.error("Test email error:", error);
+      toast({
+        title: "Failed to send test email",
+        description: "Please try again or check your email configuration.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Card className="mt-6 border-fresh/20 bg-fresh/5">
       <CardHeader>
@@ -120,14 +166,27 @@ export const ShelfLifeResults = ({
                   </p>
                 </div>
               </div>
-              <Button 
-                onClick={() => onSetReminder?.({ expiryDate, reminderDate, shelfLifeDays })}
-                className="bg-fresh hover:bg-fresh/90 text-white"
-                size="sm"
-              >
-                <Bell className="h-4 w-4 mr-2" />
-                Set Reminder
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => onSetReminder?.({ expiryDate, reminderDate, shelfLifeDays })}
+                  className="bg-fresh hover:bg-fresh/90 text-white"
+                  size="sm"
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  Set Reminder
+                </Button>
+                {user && (
+                  <Button
+                    onClick={handleSendTestEmail}
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Test Email
+                  </Button>
+                )}
+              </div>
             </div>
             
             {reminderDate && (

@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, AlertTriangle, Bell, Mail, Send } from "lucide-react";
@@ -97,11 +96,11 @@ export const ShelfLifeResults = ({
     setIsSendingTestMail(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('send-test-email', {
+      const { data, error } = await supabase.functions.invoke('send-remainder-testing-gpt', {
         body: {
-          userEmail: user.email,
-          productName: productName || "Test Product",
-          expiryDate: expiryDate ? format(expiryDate, 'PPP') : "Test Date"
+          to: user.email,
+          subject: "Test Mail from Shelf Buddy",
+          body: "This is a test email to verify your email functionality is working correctly!"
         }
       });
 

@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, AlertTriangle, Bell, Mail } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, Bell, Mail, Send } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { findProductByName } from "@/data/productDatabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { toast } from "@/hooks/use-toast";
+import { scheduleReminderCron } from "@/utils/cronScheduler";
+import { useState } from "react";
 
 interface ShelfLifeResultsProps {
   productName: string;
@@ -31,6 +33,8 @@ export const ShelfLifeResults = ({
   calculationMode
 }: ShelfLifeResultsProps) => {
   const { user } = useSupabaseAuth();
+  const [isSchedulingReminder, setIsSchedulingReminder] = useState(false);
+  const [isSendingTestMail, setIsSendingTestMail] = useState(false);
 
   const getShelfLifeDays = () => {
     // Product-based calculation (preferred if product found)
@@ -79,22 +83,24 @@ export const ShelfLifeResults = ({
   const usingProductData = calculationMode === "product" && Boolean(foundProduct);
   const usingCategoryEstimate = calculationMode === "category" || !foundProduct;
 
-  const handleSendTestEmail = async () => {
+  const handleSendTestMail = async () => {
     if (!user?.email) {
       toast({
-        title: "Email required",
-        description: "Please login to test email functionality.",
+        title: "Login required",
+        description: "Please login to send test emails.",
         variant: "destructive"
       });
       return;
     }
 
+    setIsSendingTestMail(true);
+    
     try {
-      const { data, error } = await supabase.functions.invoke('send-test-email', {
+      const { data, error } = await supabase.functions.invoke('send-remainder-testing-gpt', {
         body: {
-          userEmail: user.email,
-          productName: productName || "Test Product",
-          expiryDate: expiryDate ? format(expiryDate, 'PPP') : "Test Expiry Date"
+          to: user.email,
+          subject: "Test Mail from Shelf Buddy",
+          body: "This is a test email to verify your email functionality is working correctly!"
         }
       });
 
@@ -102,7 +108,7 @@ export const ShelfLifeResults = ({
         console.error("Test email error:", error);
         toast({
           title: "Failed to send test email",
-          description: error.message || "Please check your email configuration.",
+          description: error.message || "Please try again.",
           variant: "destructive"
         });
         return;
@@ -116,9 +122,72 @@ export const ShelfLifeResults = ({
       console.error("Test email error:", error);
       toast({
         title: "Failed to send test email",
-        description: "Please try again or check your email configuration.",
+        description: "Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsSendingTestMail(false);
+    }
+  };
+
+  const handleSetReminder = async () => {
+    if (!user?.email) {
+      toast({
+        title: "Login required",
+        description: "Please login to set reminders.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!expiryDate) {
+      toast({
+        title: "Expiry date required",
+        description: "Please enter a manufacturing date to calculate expiry date.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!productName) {
+      toast({
+        title: "Product name required",
+        description: "Please enter a product name to set reminders.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSchedulingReminder(true);
+
+    try {
+      // Generate a unique product ID for this reminder
+      const productId = `${user.id}_${Date.now()}`;
+      
+      await scheduleReminderCron(
+        productId,
+        user.email,
+        productName,
+        expiryDate
+      );
+
+      toast({
+        title: "Reminder scheduled! ⏰",
+        description: `You'll receive reminders at 8:00 AM and 6:00 PM on ${format(addDays(expiryDate, -2), 'PPP')}`,
+      });
+
+      // Also call the original onSetReminder if provided
+      onSetReminder?.({ expiryDate, reminderDate, shelfLifeDays });
+
+    } catch (error: any) {
+      console.error("Scheduling reminder error:", error);
+      toast({
+        title: "Failed to schedule reminder",
+        description: error.message || "Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSchedulingReminder(false);
     }
   };
 
@@ -168,22 +237,24 @@ export const ShelfLifeResults = ({
               </div>
               <div className="flex gap-2">
                 <Button 
-                  onClick={() => onSetReminder?.({ expiryDate, reminderDate, shelfLifeDays })}
+                  onClick={handleSetReminder}
                   className="bg-fresh hover:bg-fresh/90 text-white"
                   size="sm"
+                  disabled={isSchedulingReminder}
                 >
                   <Bell className="h-4 w-4 mr-2" />
-                  Set Reminder
+                  {isSchedulingReminder ? "Scheduling..." : "Set Reminder"}
                 </Button>
                 {user && (
                   <Button
-                    onClick={handleSendTestEmail}
+                    onClick={handleSendTestMail}
                     variant="outline"
                     size="sm"
                     className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                    disabled={isSendingTestMail}
                   >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Test Email
+                    <Send className="h-4 w-4 mr-2" />
+                    {isSendingTestMail ? "Sending..." : "Send Test Mail"}
                   </Button>
                 )}
               </div>
@@ -193,7 +264,7 @@ export const ShelfLifeResults = ({
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-warning/10 p-3 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-warning" />
                 <span>
-                  Reminder will be sent on {format(reminderDate, 'PPP')} (2 days before expiry)
+                  Reminder will be sent on {format(reminderDate, 'PPP')} at 8:00 AM and 6:00 PM
                 </span>
               </div>
             )}
@@ -224,6 +295,22 @@ export const ShelfLifeResults = ({
                 </p>
               </div>
             </div>
+
+            {/* Test Mail button even without expiry date */}
+            {user && (
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleSendTestMail}
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                  disabled={isSendingTestMail}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {isSendingTestMail ? "Sending..." : "Send Test Mail"}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

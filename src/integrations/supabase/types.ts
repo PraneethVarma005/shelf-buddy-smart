@@ -91,7 +91,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      execute_sql: {
+        Args: { query: string }
+        Returns: string
+      }
+      send_email: {
+        Args: { body_html: string; recipient: string; subject: string }
+        Returns: undefined
+      }
+      send_expiry_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

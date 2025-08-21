@@ -40,7 +40,8 @@ export const scheduleReminderCron = async (
     );
   `;
 
-  const { data, error } = await supabase.rpc('execute_sql', {
+  // Cast the rpc call because the generated types don't include execute_sql yet
+  const { data, error } = await (supabase.rpc as any)('execute_sql', {
     query: cronQuery
   });
 

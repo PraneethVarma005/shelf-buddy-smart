@@ -25,34 +25,72 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { userEmail, productName, expiryDate } = await req.json();
+    // Accept optional userName, but we'll also try to fetch from profiles
+    const { userEmail, productName, expiryDate, userName } = await req.json();
 
-    console.log("Sending test email to:", userEmail, "for product:", productName);
+    if (!userEmail) {
+      return new Response(JSON.stringify({ error: "userEmail is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    console.log("📨 Preparing test email for:", userEmail, "product:", productName, "expiry:", expiryDate);
+
+    // Try to determine a display name: prefer provided userName, then profile first/last, then email local part
+    let displayName = (userName || "").trim();
+
+    if (!displayName) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("email", userEmail)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn("Could not fetch profile name for test email:", profileError);
+      }
+
+      const combined = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
+      displayName = combined || (userEmail.includes("@") ? userEmail.split("@")[0] : "there");
+    }
+
+    // Subject per your requested phrasing
+    const subject = "This is a test mail which is used for checking weather you are getting mails or not.";
 
     const html = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.5; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #16a34a;">📧 Test Email from Shelf Buddy</h2>
-        <p>This is a <strong>test email</strong> to verify that your email reminders are working correctly!</p>
-        
-        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #0369a1;">Product Test Details:</h3>
-          <p><strong>Product:</strong> ${productName || "Test Product"}</p>
-          <p><strong>Expiry Date:</strong> ${expiryDate || "Test Date"}</p>
-          <p><strong>Email:</strong> ${userEmail}</p>
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 640px; margin: 0 auto; padding: 16px;">
+        <p style="margin: 0 0 12px 0;">Greetings, <strong>${displayName}</strong>!</p>
+
+        <h2 style="color: #16a34a; margin: 0 0 12px 0;">${subject}</h2>
+
+        <p style="margin: 0 0 12px 0;">
+          This is a test email from Shelf Buddy to confirm that your email reminders are working correctly.
+        </p>
+
+        <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <h3 style="margin: 0 0 8px 0; color: #0369a1;">Sample Details</h3>
+          <p style="margin: 4px 0;"><strong>Product:</strong> ${productName || "Test Product"}</p>
+          <p style="margin: 4px 0;"><strong>Expiry Date:</strong> ${expiryDate || "Test Date"}</p>
+          <p style="margin: 4px 0;"><strong>Email:</strong> ${userEmail}</p>
         </div>
 
-        <p>✅ <strong>Great news!</strong> Your email system is working perfectly. You'll receive actual reminders 2 days before your products expire.</p>
-        
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">
+        <p style="margin: 12px 0;">
+          Thanks for using Shelf Buddy — we appreciate you! Have a wonderful day.
+        </p>
+
+        <p style="color: #666; font-size: 12px; margin-top: 24px;">
           This test email was sent from Shelf Buddy's reminder system.
         </p>
       </div>
     `;
 
+    console.log("📧 Sending test email to:", userEmail, "with subject:", subject);
+
     const { error: sendError } = await resend.emails.send({
       from: "Shelf Buddy <onboarding@resend.dev>",
       to: [userEmail],
-      subject: "🧪 Test Email - Shelf Buddy Reminder System Working!",
+      subject,
       html,
     });
 
@@ -64,7 +102,7 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log("Test email sent successfully to:", userEmail);
+    console.log("✅ Test email sent successfully to:", userEmail);
 
     return new Response(
       JSON.stringify({ success: true, message: "Test email sent successfully!" }),

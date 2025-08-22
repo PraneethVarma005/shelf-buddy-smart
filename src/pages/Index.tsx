@@ -1,6 +1,7 @@
 
 import { ShelfBuddyForm } from "@/components/ShelfBuddyForm";
 import { InfoAccordion } from "@/components/InfoAccordion";
+import { UpcomingReminders } from "@/components/UpcomingReminders";
 import { Leaf, Shield, Calendar, Thermometer, LogIn, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
@@ -56,6 +57,13 @@ const Index = () => {
         <div className="form-card mb-8 animate-slide-up">
           <ShelfBuddyForm />
         </div>
+
+        {/* Upcoming Reminders - only show if user is logged in */}
+        {user && (
+          <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <UpcomingReminders />
+          </div>
+        )}
 
         {/* Information Sections */}
         <div className="space-y-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>

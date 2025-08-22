@@ -34,14 +34,13 @@ export const scheduleReminderCron = async (
         net.http_post(
           url:='https://enlatyrcvbzlbmaafjyd.supabase.co/functions/v1/send-remainder-testing-gpt',
           headers:='{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVubGF0eXJjdmJ6bGJtYWFmanlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MjE1MTcsImV4cCI6MjA3MTA5NzUxN30.HEh2XxiuQI4J29PPUDFzRmndr8l6IM1JdznnGKzyTPQ"}',
-          body:='${JSON.stringify(emailBody)}'
+          body:='${JSON.stringify(emailBody).replace(/'/g, "''")}'
         )
       $$
     );
   `;
 
-  // Cast the rpc call because the generated types don't include execute_sql yet
-  const { data, error } = await (supabase.rpc as any)('execute_sql', {
+  const { data, error } = await supabase.rpc('execute_sql', {
     query: cronQuery
   });
 

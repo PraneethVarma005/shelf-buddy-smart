@@ -15,6 +15,7 @@ interface Reminder {
   expiry_date: string;
   reminder_date: string;
   reminder_sent: boolean;
+  cancelled: boolean; // NEW
 }
 
 export const UpcomingReminders = () => {
@@ -31,7 +32,7 @@ export const UpcomingReminders = () => {
         const today = new Date().toISOString().slice(0, 10);
         const { data, error } = await supabase
           .from("products")
-          .select("id, product_name, category, expiry_date, reminder_date, reminder_sent")
+          .select("id, product_name, category, expiry_date, reminder_date, reminder_sent, cancelled") // include cancelled
           .eq("user_id", user.id)
           .gte("reminder_date", today)
           .order("reminder_date", { ascending: true });
@@ -41,7 +42,7 @@ export const UpcomingReminders = () => {
           return;
         }
 
-        setReminders(data || []);
+        setReminders((data || []) as Reminder[]);
       } catch (error) {
         console.error("Error:", error);
       } finally {
@@ -58,10 +59,10 @@ export const UpcomingReminders = () => {
     setCancellingId(reminder.id);
     
     try {
-      // Update the product to mark reminder as sent (cancelled)
+      // Mark as cancelled (do NOT mark as reminder_sent)
       const { error: updateError } = await supabase
         .from("products")
-        .update({ reminder_sent: true })
+        .update({ cancelled: true })
         .eq("id", reminder.id)
         .eq("user_id", user.id);
 
@@ -69,7 +70,7 @@ export const UpcomingReminders = () => {
         throw updateError;
       }
 
-      // Send cancellation notification
+      // Send cancellation notification (best-effort)
       const { error: notificationError } = await supabase.functions.invoke('send-cancellation-notification', {
         body: {
           userEmail: user.email,
@@ -81,11 +82,10 @@ export const UpcomingReminders = () => {
 
       if (notificationError) {
         console.error("Failed to send cancellation notification:", notificationError);
-        // Don't throw error here as the main action (cancelling) succeeded
       }
 
-      // Remove from local state
-      setReminders(prev => prev.filter(r => r.id !== reminder.id));
+      // Update local state to show as cancelled (do not remove)
+      setReminders(prev => prev.map(r => r.id === reminder.id ? { ...r, cancelled: true } : r));
       
       toast.success(`Reminder cancelled for ${reminder.product_name}`);
     } catch (error) {
@@ -141,58 +141,65 @@ export const UpcomingReminders = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {reminders.map((reminder) => (
-          <div 
-            key={reminder.id} 
-            className="flex items-center justify-between p-4 bg-background rounded-lg border"
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${reminder.reminder_sent ? 'bg-green-100' : 'bg-yellow-100'}`}>
-                {reminder.reminder_sent ? (
-                  <Calendar className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Clock className="h-4 w-4 text-yellow-600" />
+        {reminders.map((reminder) => {
+          const isCancelled = reminder.cancelled;
+          const isSent = reminder.reminder_sent;
+
+          return (
+            <div 
+              key={reminder.id} 
+              className="flex items-center justify-between p-4 bg-background rounded-lg border"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${isCancelled ? 'bg-destructive/10' : isSent ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                  {isCancelled ? (
+                    <X className="h-4 w-4 text-destructive" />
+                  ) : isSent ? (
+                    <Calendar className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold">{reminder.product_name}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Category: {reminder.category?.replace(/_/g, ' ') || 'Not specified'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <div className="flex items-center gap-2 text-sm">
+                    <AlertTriangle className="h-4 w-4 text-warning" />
+                    <span>Reminder: {format(new Date(reminder.reminder_date), 'PPP')}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Expires: {format(new Date(reminder.expiry_date), 'PPP')}
+                  </div>
+                  <div className={`text-xs ${isCancelled ? 'text-destructive' : isSent ? 'text-green-600' : 'text-yellow-600'}`}>
+                    {isCancelled ? 'Cancelled' : isSent ? 'Reminder sent' : 'Reminder pending'}
+                  </div>
+                </div>
+                {!isSent && !isCancelled && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCancelReminder(reminder)}
+                    disabled={cancellingId === reminder.id}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    {cancellingId === reminder.id ? (
+                      <Clock className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                    Cancel
+                  </Button>
                 )}
               </div>
-              <div>
-                <h3 className="font-semibold">{reminder.product_name}</h3>
-                <p className="text-sm text-muted-foreground">
-                  Category: {reminder.category?.replace(/_/g, ' ') || 'Not specified'}
-                </p>
-              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="flex items-center gap-2 text-sm">
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                  <span>Reminder: {format(new Date(reminder.reminder_date), 'PPP')}</span>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Expires: {format(new Date(reminder.expiry_date), 'PPP')}
-                </div>
-                <div className={`text-xs ${reminder.reminder_sent ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {reminder.reminder_sent ? 'Reminder sent' : 'Reminder pending'}
-                </div>
-              </div>
-              {!reminder.reminder_sent && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleCancelReminder(reminder)}
-                  disabled={cancellingId === reminder.id}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  {cancellingId === reminder.id ? (
-                    <Clock className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <X className="h-4 w-4" />
-                  )}
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </CardContent>
     </Card>
   );

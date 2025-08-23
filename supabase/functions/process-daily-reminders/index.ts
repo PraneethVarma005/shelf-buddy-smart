@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.55.0";
 import { Resend } from "npm:resend@4.0.0";
@@ -43,7 +42,6 @@ serve(async (req: Request): Promise<Response> => {
   try {
     console.log("Processing daily reminders...");
 
-    // Find products that need reminders today or earlier and haven't been sent
     const today = new Date().toISOString().slice(0, 10);
     
     const { data: products, error } = await supabase
@@ -59,7 +57,8 @@ serve(async (req: Request): Promise<Response> => {
         profiles:profiles!inner(email)
       `)
       .lte("reminder_date", today)
-      .eq("reminder_sent", false);
+      .eq("reminder_sent", false)
+      .eq("cancelled", false);
 
     if (error) {
       console.error("Error fetching products:", error);
@@ -119,7 +118,6 @@ serve(async (req: Request): Promise<Response> => {
             continue;
           }
 
-          // Mark as sent
           const { error: updateError } = await supabase
             .from("products")
             .update({ reminder_sent: true })

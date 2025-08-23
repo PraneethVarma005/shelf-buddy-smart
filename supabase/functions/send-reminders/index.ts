@@ -55,7 +55,8 @@ serve(async (req: Request): Promise<Response> => {
         profiles:profiles!inner(email)
       `)
       .lte("reminder_date", new Date().toISOString().slice(0, 10))
-      .eq("reminder_sent", false);
+      .eq("reminder_sent", false)
+      .eq("cancelled", false); // NEW: skip cancelled
 
     if (error) throw error;
 

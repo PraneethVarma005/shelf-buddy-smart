@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       products: {
         Row: {
+          cancelled: boolean | null
           category: string
           created_at: string
           expiry_date: string | null
@@ -30,6 +31,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cancelled?: boolean | null
           category: string
           created_at?: string
           expiry_date?: string | null
@@ -44,6 +46,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cancelled?: boolean | null
           category?: string
           created_at?: string
           expiry_date?: string | null

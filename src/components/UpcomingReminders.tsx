@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Clock, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar, Clock, AlertTriangle, X } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface Reminder {
   id: string;
@@ -19,6 +21,7 @@ export const UpcomingReminders = () => {
   const { user } = useSupabaseAuth();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUpcomingReminders = async () => {
@@ -48,6 +51,50 @@ export const UpcomingReminders = () => {
 
     fetchUpcomingReminders();
   }, [user]);
+
+  const handleCancelReminder = async (reminder: Reminder) => {
+    if (!user) return;
+
+    setCancellingId(reminder.id);
+    
+    try {
+      // Update the product to mark reminder as sent (cancelled)
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ reminder_sent: true })
+        .eq("id", reminder.id)
+        .eq("user_id", user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Send cancellation notification
+      const { error: notificationError } = await supabase.functions.invoke('send-cancellation-notification', {
+        body: {
+          userEmail: user.email,
+          productName: reminder.product_name,
+          expiryDate: reminder.expiry_date,
+          productId: reminder.id
+        }
+      });
+
+      if (notificationError) {
+        console.error("Failed to send cancellation notification:", notificationError);
+        // Don't throw error here as the main action (cancelling) succeeded
+      }
+
+      // Remove from local state
+      setReminders(prev => prev.filter(r => r.id !== reminder.id));
+      
+      toast.success(`Reminder cancelled for ${reminder.product_name}`);
+    } catch (error) {
+      console.error("Error cancelling reminder:", error);
+      toast.error("Failed to cancel reminder. Please try again.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   if (!user) {
     return (
@@ -114,17 +161,35 @@ export const UpcomingReminders = () => {
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="flex items-center gap-2 text-sm">
-                <AlertTriangle className="h-4 w-4 text-warning" />
-                <span>Reminder: {format(new Date(reminder.reminder_date), 'PPP')}</span>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="flex items-center gap-2 text-sm">
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                  <span>Reminder: {format(new Date(reminder.reminder_date), 'PPP')}</span>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Expires: {format(new Date(reminder.expiry_date), 'PPP')}
+                </div>
+                <div className={`text-xs ${reminder.reminder_sent ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {reminder.reminder_sent ? 'Reminder sent' : 'Reminder pending'}
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground">
-                Expires: {format(new Date(reminder.expiry_date), 'PPP')}
-              </div>
-              <div className={`text-xs ${reminder.reminder_sent ? 'text-green-600' : 'text-yellow-600'}`}>
-                {reminder.reminder_sent ? 'Reminder sent' : 'Reminder pending'}
-              </div>
+              {!reminder.reminder_sent && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCancelReminder(reminder)}
+                  disabled={cancellingId === reminder.id}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  {cancellingId === reminder.id ? (
+                    <Clock className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
+                  Cancel
+                </Button>
+              )}
             </div>
           </div>
         ))}

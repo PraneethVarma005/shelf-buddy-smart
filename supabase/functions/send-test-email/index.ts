@@ -87,9 +87,10 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log("📧 Sending test email to:", userEmail, "with subject:", subject);
 
+    // IMPORTANT: Resend v4 in this environment expects a string for "to"
     const { error: sendError } = await resend.emails.send({
       from: "Shelf Buddy <onboarding@resend.dev>",
-      to: [userEmail],
+      to: userEmail, // changed from [userEmail] to userEmail
       subject,
       html,
     });
